@@ -6,9 +6,9 @@
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
-    "publish-patch": "npm version patch && npm run build && npm publish",
-    "publish-minor": "npm version minor && npm run build && npm publish",
-    "publish-major": "npm version major && npm run build && npm publish",
+    "publish-patch": "rm -rf lib/ && npm version patch && npm run build && npm publish",
+    "publish-minor": "rm -rf lib/ && npm version minor && npm run build && npm publish",
+    "publish-major": "rm -rf lib/ && npm version major && npm run build && npm publish",
     "build-types": "tsc --declaration --outDir ./typings"
   },
   "keywords": [],
