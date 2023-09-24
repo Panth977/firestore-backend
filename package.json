@@ -1,0 +1,39 @@
+{
+  "name": "@panth977/firestore-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "lib/index.js",
+  "scripts": {
+    "lint": "eslint --ext .js,.ts .",
+    "build": "tsc",
+    "publish-patch": "npm version patch && npm run build && npm publish",
+    "publish-minor": "npm version minor && npm run build && npm publish",
+    "publish-major": "npm version major && npm run build && npm publish",
+    "build-types": "tsc --declaration --outDir ./typings"
+  },
+  "keywords": [],
+  "author": "Vardayini Tech",
+  "license": "ISC",
+  "dependencies": {
+    "zod": "^3.21.4"
+  },
+  "prettier": {
+    "printWidth": 150,
+    "singleQuote": true,
+    "trailingComma": "es5",
+    "endOfLine": "lf",
+    "tabWidth": 4
+  },
+  "devDependencies": {
+    "firebase-admin": "^11.8.0",
+    "@typescript-eslint/eslint-plugin": "^5.12.0",
+    "@typescript-eslint/parser": "^5.12.0",
+    "eslint": "^8.9.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-import": "^2.25.4",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^4.9.0"
+  }
+}
