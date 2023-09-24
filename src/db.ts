@@ -38,60 +38,51 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
         this.validateDocRef(data.$);
         return Ref.doc(this.db, data);
     }
-    query<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(data: Ref.TQueryArg<T>, params: Ref.QueryParams): Ref.TQuery<T> {
+    query<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(data: Ref.TQueryArg<T>, params?: Ref.QueryParams): Ref.TQuery<T> {
         this.validateCollRef(data.$);
-        return Ref.query(this.db, data, params);
+        return Ref.query(this.db, data, params ?? {});
     }
-    async create(ref: Ref.TDoc<DbPaths<DbPathsMap>>, context: null | Parser.TEventBy, data: Record<string | number, unknown>) {
+    async create<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>, context: null | Parser.TEventBy, data: Record<string | number, unknown>) {
         this.validateDocRef(ref.$);
         await this.apis.create(Ref.getDocRef(ref), Parser.formJsonToFirestoreDoc('create', ref, data, context));
     }
-    async update(ref: Ref.TDoc<DbPaths<DbPathsMap>>, context: null | Parser.TEventBy, data: Record<string | number, unknown>) {
+    async update<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>, context: null | Parser.TEventBy, data: Record<string | number, unknown>) {
         this.validateDocRef(ref.$);
         await this.apis.update(Ref.getDocRef(ref), Parser.formJsonToFirestoreDoc('update', ref, data, context));
     }
-    async delete(ref: Ref.TDoc<DbPaths<DbPathsMap>>, context: null | Parser.TEventBy, data?: Record<string | number, unknown>) {
+    async delete<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>, context: null | Parser.TEventBy, data?: Record<string | number, unknown>) {
         this.validateDocRef(ref.$);
         await this.apis.update(Ref.getDocRef(ref), Parser.formJsonToFirestoreDoc('delete', ref, data ?? {}, context));
     }
-    async hardDelete(ref: Ref.TDoc<DbPaths<DbPathsMap>>) {
+    async hardDelete<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>) {
         this.validateDocRef(ref.$);
         await this.apis.delete(Ref.getDocRef(ref));
     }
-    async getDoc<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>) {
-        this.validateDocRef(ref.$);
-        const snap = await this.apis.get(Ref.getDocRef(ref));
-        return Parser.formSnapshotToJson(this.db, ref, snap);
-    }
-    async getDocs<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
+
+    get<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>): Promise<Parser.TDbDoc<T>>;
+    get<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
         ref: Ref.TQuery<T>,
-        { limit, cursor }: { limit?: number; cursor?: unknown }
-    ) {
-        let query = Ref.getQueryRef(ref);
-        if (cursor) query = query.startAfter(cursor);
-        if (limit) query = query.limit(limit);
-        const snaps = await this.apis.get(query);
-        return snaps.docs.map((x) =>
-            Parser.formSnapshotToJson(this.db, (this.collectionGroupsMap[ref.$] ?? ref.$) as TGetDbPath<T, DbPathsMap, CollectionGroupMap>, x)
-        );
-    }
-    async getPaginatedDocs<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
-        ref: Ref.TQuery<T>,
-        { pageRef, limit }: { pageRef?: { count: number; sent: number; cursor: unknown }; limit: number }
-    ) {
-        pageRef = Object.assign({}, pageRef ?? { count: 0, sent: 0, cursor: undefined });
-        const isLastBatch = pageRef.count - pageRef.sent < limit * 1.7;
-        const fetchDocs = this.getDocs(ref, {
-            limit: isLastBatch ? Math.max(pageRef.count - pageRef.sent, limit) : limit,
-            cursor: pageRef.cursor,
-        });
-        const [docs, count] = await Promise.all([
-            fetchDocs,
-            isLastBatch ? this.apis.get(Ref.getQueryRef(ref).count()).then((snap) => snap.data().count) : pageRef.count,
-        ]);
-        pageRef.sent += docs.length;
-        pageRef.count = count;
-        pageRef.cursor = docs[docs.length - 1].getVal(Ref.getQueryParams(ref).orderBy[0]);
-        return Object.assign(docs, { pageRef });
+        { limit, cursor, orderBy }: { limit?: number; cursor?: unknown; orderBy?: [string, 'desc' | 'asc'] }
+    ): Promise<Parser.TDbDoc<TGetDbPath<T, DbPathsMap, CollectionGroupMap>>[] & { cursor: unknown }>;
+    async get(...arg: never) {
+        if (Ref.getDocRef(arg[0])) {
+            const [ref] = arg as [Ref.TDoc<string>];
+            this.validateDocRef(ref.$);
+            const snap = await this.apis.get(Ref.getDocRef(ref));
+            return Parser.formSnapshotToJson(this.db, ref, snap) as never;
+        } else {
+            (arg as unknown[]).push({});
+            const [ref, params] = arg as [Ref.TQuery<string>, { limit?: number; cursor?: unknown; orderBy?: [string, 'desc' | 'asc'] }];
+            let query = Ref.getQueryRef(ref);
+            const snaps = await this.apis.get(query);
+            if (!params.orderBy) params.orderBy = ['$standard.created_at', 'desc'];
+            query = query.orderBy(...params.orderBy);
+            if (params.cursor) query = query.startAfter(params.cursor);
+            if (params.limit) query = query.limit(params.limit);
+            return Object.assign(
+                snaps.docs.map((x) => Parser.formSnapshotToJson(this.db, this.collectionGroupsMap[ref.$] ?? ref.$, x)),
+                { cursor: snaps.docs[snaps.docs.length - 1].get(params.orderBy[0]) }
+            ) as never;
+        }
     }
 }

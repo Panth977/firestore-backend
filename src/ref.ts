@@ -55,7 +55,6 @@ export type QueryParams = {
     filters?: {
         [fieldPath: string]: ['<' | '<=' | '==' | '!=' | '>=' | '>' | 'array-contains' | 'in' | 'not-in' | 'array-contains-any', unknown];
     };
-    orderBy: [string, 'desc' | 'asc'];
     allowDeleted?: boolean;
 };
 export type TQueryArg<T extends string> = { $: T } & Params<T, true>;
@@ -74,11 +73,10 @@ export function query<T extends string>(db: FirebaseFirestore.Firestore, data: T
         params.filters['$on_delete'] = ['==', null];
     }
     if (params.filters) for (const field in params.filters) query = query.where(field, ...params.filters[field]);
-    if (params.orderBy) query = query.orderBy(...params.orderBy);
     return Object.assign(data, { [queryRef]: query, [queryParams]: params });
 }
 export function getQueryRef(query: TQuery<string>) {
-    return query[queryRef].startAfter();
+    return query[queryRef];
 }
 export function getQueryParams(query: TQuery<string>) {
     return query[queryParams];
