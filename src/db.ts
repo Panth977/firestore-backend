@@ -59,30 +59,47 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
         await this.apis.delete(Ref.getDocRef(ref));
     }
 
-    get<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>): Promise<Parser.TDbDoc<T>>;
-    get<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
-        ref: Ref.TQuery<T>,
-        { limit, cursor, orderBy }: { limit?: number; cursor?: unknown; orderBy?: [string, 'desc' | 'asc'] }
-    ): Promise<Parser.TDbDoc<TGetDbPath<T, DbPathsMap, CollectionGroupMap>>[] & { cursor: unknown }>;
-    async get(...arg: never) {
-        if (Ref.getDocRef(arg[0])) {
-            const [ref] = arg as [Ref.TDoc<string>];
-            this.validateDocRef(ref.$);
-            const snap = await this.apis.get(Ref.getDocRef(ref));
-            return Parser.formSnapshotToJson(this.db, ref, snap) as never;
-        } else {
-            (arg as unknown[]).push({});
-            const [ref, params] = arg as [Ref.TQuery<string>, { limit?: number; cursor?: unknown; orderBy?: [string, 'desc' | 'asc'] }];
-            let query = Ref.getQueryRef(ref);
-            const snaps = await this.apis.get(query);
-            if (!params.orderBy) params.orderBy = ['$standard.created_at', 'desc'];
-            query = query.orderBy(...params.orderBy);
-            if (params.cursor) query = query.startAfter(params.cursor);
-            if (params.limit) query = query.limit(params.limit);
-            return Object.assign(
-                snaps.docs.map((x) => Parser.formSnapshotToJson(this.db, this.collectionGroupsMap[ref.$] ?? ref.$, x)),
-                { cursor: snaps.docs[snaps.docs.length - 1].get(params.orderBy[0]) }
-            ) as never;
-        }
+    async getDoc<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>) {
+        this.validateDocRef(ref.$);
+        const snap = await this.apis.get(Ref.getDocRef(ref));
+        return Parser.fromSnapshotToJson(this.db, ref, snap);
     }
+
+    async getQuery<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
+        ref: Ref.TQuery<T>,
+        params: { limit?: number; cursor?: string; orderBy?: [string, 'desc' | 'asc'] }
+    ) {
+        let query = Ref.getQueryRef(ref);
+        query = addCursor(params, query);
+        if (params.limit) query = query.limit(params.limit);
+        const snaps = await this.apis.get(query);
+        const $: TGetDbPath<T, DbPathsMap, CollectionGroupMap> = (this.collectionGroupsMap[ref.$] ?? ref.$) as never;
+        return Object.assign(
+            snaps.docs.map((x) => Parser.fromSnapshotToJson(this.db, $, x)),
+            { cursor: createCursor(params, snaps.docs[snaps.docs.length - 1]) }
+        );
+    }
+}
+
+interface CursorParams {
+    cursor?: string;
+    orderBy?: [string, 'desc' | 'asc'];
+}
+
+function addCursor({ cursor, orderBy }: CursorParams, query: FirebaseFirestore.Query) {
+    if (!orderBy) orderBy = ['$standard.created_at', 'desc'];
+    query = query.orderBy(...orderBy);
+    if (!cursor) return query;
+    const { orderedBy, fieldValue } = JSON.parse(cursor);
+    if (orderedBy !== `${orderBy[1]}: ${orderBy[0]}`) throw new Error('Cursor found has a different ordering then mentioned in query');
+    if (fieldValue) return query.startAfter(Parser.decodeField(fieldValue));
+    return query;
+}
+
+function createCursor({ cursor, orderBy }: CursorParams, lastDoc?: FirebaseFirestore.DocumentSnapshot) {
+    if (!orderBy) orderBy = ['$standard.created_at', 'desc'];
+    const orderedBy = `${orderBy[1]}: ${orderBy[0]}`;
+    if (lastDoc) return JSON.stringify({ orderedBy: orderedBy, fieldValue: Parser.encodeField(lastDoc.get(orderBy[0])) });
+    if (cursor) return cursor;
+    return JSON.stringify({ orderedBy: orderedBy, fieldValue: null });
 }

@@ -75,7 +75,6 @@ const AccountEventParser = z.object({
     device_iso_timestamp: z.coerce.date().nullish(),
 });
 const MetaParser = {
-    $ref: z.map(z.string(), z.string()).transform((x) => Object.fromEntries(x)),
     $standard: z.object({ created_at: z.date(), updated_at: z.date() }),
     $on_create: AccountEventParser,
     $on_update: AccountEventParser.nullish(),
@@ -93,13 +92,15 @@ const parseFormFirestoreDocToJson = transformJson({
     },
 });
 export type TDbDoc<T extends string> = {
-    getMetaData(type: '$ref'): pointer.TDoc<T>;
-    getMetaData<K extends keyof typeof MetaParser>(type: K): (typeof MetaParser)[K]['_output'];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    getVal<Z extends z.ZodType>(field: string, parser?: Z): Z extends z.ZodType ? Z['_output'] : any;
+    data(): { [K in keyof typeof MetaParser]: (typeof MetaParser)[K]['_output'] } & { $ref: pointer.TDoc<T> } & Record<string, any>;
+    getVal(type: '$ref'): pointer.TDoc<T>;
+    getVal<K extends keyof typeof MetaParser>(type: K): (typeof MetaParser)[K]['_output'];
+    getVal<T>(field: string): T;
+    getVal<Z extends z.ZodType>(field: string, parser: Z): Z['_output'];
     exists: boolean;
 };
-export function formSnapshotToJson<T extends string>(
+export function fromSnapshotToJson<T extends string>(
     db: FirebaseFirestore.Firestore,
     ref: pointer.TDoc<T> | T,
     snapshot: FirebaseFirestore.DocumentSnapshot
@@ -111,16 +112,27 @@ export function formSnapshotToJson<T extends string>(
     }
     if (typeof ref === 'string') ref = pointer.doc(db, getVal('$ref') as never, snapshot.ref);
     return {
-        getMetaData(type: keyof typeof MetaParser) {
-            if (!type.startsWith('$')) throw new Error("Can't access non-meta properties, use 'snapshot.getVal()' instead");
-            return MetaParser[type].parse(getVal(type)) as never;
+        data() {
+            if (!snapshot.exists) new Error('No data found');
+            return Object.assign(snapshot.data() as never, { ref: ref });
         },
-        getVal(field, parser) {
-            if (field.startsWith('$')) throw new Error("Can't access meta data, use 'snapshot.getMetaData()' instead");
+        getVal(field: string, parser?: z.ZodType) {
+            if (field === '$ref') return ref as never;
+            parser ??= (MetaParser as Record<string, z.ZodType>)[field] as never;
             let val = getVal(field);
             if (parser) val = parser.parse(val);
             return val as never;
         },
         exists: snapshot.exists,
     };
+}
+/* ****** Local <=> Json ****** */
+export function encodeField(val: unknown) {
+    if (val instanceof admin.firestore.Timestamp) return JSON.stringify({ type: 'Timestamp', val: val.toDate().getTime() });
+    return JSON.stringify({ val });
+}
+export function decodeField(str: string) {
+    const proxy = JSON.parse(str);
+    if (proxy.type === 'Timestamp') return admin.firestore.Timestamp.fromDate(new Date(proxy.val));
+    return proxy.val;
 }
