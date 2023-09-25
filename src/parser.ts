@@ -96,7 +96,8 @@ export type TDbDoc<T extends string> = {
     data(): { [K in keyof typeof MetaParser]: (typeof MetaParser)[K]['_output'] } & { $ref: pointer.TDoc<T> } & Record<string, any>;
     getVal(type: '$ref'): pointer.TDoc<T>;
     getVal<K extends keyof typeof MetaParser>(type: K): (typeof MetaParser)[K]['_output'];
-    getVal<T>(field: string): T;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    getVal<T = any>(field: string): T;
     getVal<Z extends z.ZodType>(field: string, parser: Z): Z['_output'];
     exists: boolean;
 };
