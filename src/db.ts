@@ -77,10 +77,10 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
         return [docRef] as const;
     }
 
-    async getDoc<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>) {
-        this.validateDocRef(ref.$);
-        const snap = await this.apis.get(Ref.getDocRef(ref));
-        return Parser.fromSnapshotToJson(this.db, ref, snap);
+    async getDoc<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T> | Ref.TDocArg<T>) {
+        const docRef = this.doc(ref);
+        const snap = await this.apis.get(Ref.getDocRef(docRef));
+        return Parser.fromSnapshotToJson(this.db, docRef, snap);
     }
     async getQuery<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
         ref: Ref.TQuery<T>,
