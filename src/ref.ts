@@ -25,7 +25,12 @@ export type TDocArg<T extends string> = { $: T } & Params<T, false>;
 export type TDoc<T extends string> = TDocRef<T> & Params<T, false>;
 export const autoDocID = '{undefined}' as never;
 
-export function doc<T extends string>(db: FirebaseFirestore.Firestore, data: TDocArg<T>, ref?: FirebaseFirestore.DocumentReference): TDoc<T> {
+export function doc<T extends string>(
+    db: FirebaseFirestore.Firestore,
+    data: TDocArg<T> | TDoc<T>,
+    ref?: FirebaseFirestore.DocumentReference
+): TDoc<T> {
+    if (docRef in data) return data;
     if (ref) return Object.assign(data, { [docRef]: ref });
     const path = parseDataToPath(data);
     if (path.removedTrailing) {

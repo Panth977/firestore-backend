@@ -42,21 +42,39 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
         this.validateCollRef(data.$);
         return Ref.query(this.db, data, params ?? {});
     }
-    async create<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>, context: null | Parser.TEventBy, data: Record<string | number, unknown>) {
-        this.validateDocRef(ref.$);
-        await this.apis.create(Ref.getDocRef(ref), Parser.formJsonToFirestoreDoc('create', ref, data, context));
+
+    async create<T extends DbPaths<DbPathsMap>, D extends Record<string | number, unknown>>(
+        ref: Ref.TDoc<T> | Ref.TDocArg<T>,
+        context: null | Parser.TEventBy,
+        data: D
+    ) {
+        const docRef = this.doc(ref);
+        await this.apis.create(Ref.getDocRef(docRef), Parser.formJsonToFirestoreDoc('create', docRef, data, context));
+        return [docRef, data] as const;
     }
-    async update<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>, context: null | Parser.TEventBy, data: Record<string | number, unknown>) {
-        this.validateDocRef(ref.$);
-        await this.apis.update(Ref.getDocRef(ref), Parser.formJsonToFirestoreDoc('update', ref, data, context));
+    async update<T extends DbPaths<DbPathsMap>, D extends Record<string | number, unknown>>(
+        ref: Ref.TDoc<T> | Ref.TDocArg<T>,
+        context: null | Parser.TEventBy,
+        data: D
+    ) {
+        const docRef = this.doc(ref);
+        await this.apis.update(Ref.getDocRef(docRef), Parser.formJsonToFirestoreDoc('update', docRef, data, context));
+        return [docRef, data] as const;
     }
-    async delete<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>, context: null | Parser.TEventBy, data?: Record<string | number, unknown>) {
-        this.validateDocRef(ref.$);
-        await this.apis.update(Ref.getDocRef(ref), Parser.formJsonToFirestoreDoc('delete', ref, data ?? {}, context));
+    async delete<T extends DbPaths<DbPathsMap>, D extends Record<string | number, unknown> = Record<never, never>>(
+        ref: Ref.TDoc<T> | Ref.TDocArg<T>,
+        context: null | Parser.TEventBy,
+        data?: D
+    ) {
+        data ??= {} as never;
+        const docRef = this.doc(ref);
+        await this.apis.update(Ref.getDocRef(docRef), Parser.formJsonToFirestoreDoc('delete', docRef, data, context));
+        return [docRef, data] as const;
     }
-    async hardDelete<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>) {
-        this.validateDocRef(ref.$);
-        await this.apis.delete(Ref.getDocRef(ref));
+    async hardDelete<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T> | Ref.TDocArg<T>) {
+        const docRef = this.doc(ref);
+        await this.apis.delete(Ref.getDocRef(docRef));
+        return [docRef] as const;
     }
 
     async getDoc<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T>) {
@@ -64,7 +82,6 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
         const snap = await this.apis.get(Ref.getDocRef(ref));
         return Parser.fromSnapshotToJson(this.db, ref, snap);
     }
-
     async getQuery<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
         ref: Ref.TQuery<T>,
         params: { limit?: number; cursor?: string; orderBy?: [string, 'desc' | 'asc'] }
