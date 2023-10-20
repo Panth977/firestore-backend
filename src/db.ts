@@ -84,7 +84,7 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
     }
     async getQuery<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
         ref: Ref.TQuery<T>,
-        params: { limit?: number; cursor?: string; orderBy?: [string, 'desc' | 'asc'] }
+        params: { limit?: number } & CursorParams
     ) {
         let query = Ref.getQueryRef(ref);
         query = addCursor(params, query);
@@ -100,7 +100,7 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
 
 interface CursorParams {
     cursor?: string;
-    orderBy?: [string, 'desc' | 'asc'];
+    orderBy?: [Parser.TDocFields, 'desc' | 'asc'];
 }
 
 function addCursor({ cursor, orderBy }: CursorParams, query: FirebaseFirestore.Query) {

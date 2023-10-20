@@ -80,6 +80,15 @@ const MetaParser = {
     $on_update: AccountEventParser.nullish(),
     $on_delete: AccountEventParser.nullish(),
 };
+type TAccountEventFields = `account_name` | `by_account_id` | `server_iso_timestamp` | `device_iso_timestamp`;
+type TMetaFields =
+    | `$standard.${`created_at` | `updated_at`}`
+    | `$on_create.${TAccountEventFields}`
+    | `$on_update`
+    | `$on_delete`
+    | `$on_update.${TAccountEventFields}`
+    | `$on_delete.${TAccountEventFields}`;
+export type TDocFields = TMetaFields | (string & Record<never, never>);
 
 const parseFormFirestoreDocToJson = transformJson({
     transformTo(val) {

@@ -1,3 +1,5 @@
+import { TDocFields } from './parser';
+
 type TParams<T extends string> = T extends `${string}/{${infer A}}${infer B}` ? [A, ...TParams<B>] : [];
 type TPop<T extends string[]> = T extends [...infer A, string] ? A : T;
 type Params<T extends string, popLast extends boolean> = {
@@ -57,9 +59,7 @@ type TQueryRef<T extends string> = {
     [queryParams]: QueryParams;
 };
 export type QueryParams = {
-    filters?: {
-        [fieldPath: string]: ['<' | '<=' | '==' | '!=' | '>=' | '>' | 'array-contains' | 'in' | 'not-in' | 'array-contains-any', unknown];
-    };
+    filters?: [TDocFields, '<' | '<=' | '==' | '!=' | '>=' | '>' | 'array-contains' | 'in' | 'not-in' | 'array-contains-any', unknown][];
     allowDeleted?: boolean;
 };
 export type TQueryArg<T extends string> = { $: T } & Params<T, true>;
@@ -74,10 +74,10 @@ export function query<T extends string>(db: FirebaseFirestore.Firestore, data: T
         query = db.collectionGroup(path.path);
     }
     if (!params.allowDeleted) {
-        if (!params.filters) params.filters = {};
-        params.filters['$on_delete'] = ['==', null];
+        if (!params.filters) params.filters = [];
+        params.filters.push(['$on_delete', '==', null]);
     }
-    if (params.filters) for (const field in params.filters) query = query.where(field, ...params.filters[field]);
+    if (params.filters) for (const [field, op, val] of params.filters) query = query.where(field, op, val);
     return Object.assign(data, { [queryRef]: query, [queryParams]: params });
 }
 export function getQueryRef(query: TQuery<string>) {
