@@ -74,12 +74,12 @@ const AccountEventParser = z.object({
     server_iso_timestamp: z.coerce.date(),
     device_iso_timestamp: z.coerce.date().nullish(),
 });
-const MetaParser = {
+export const MetaParser = z.object({
     $standard: z.object({ created_at: z.date(), updated_at: z.date() }),
     $on_create: AccountEventParser,
-    $on_update: AccountEventParser.nullish(),
-    $on_delete: AccountEventParser.nullish(),
-};
+    $on_update: AccountEventParser.nullable(),
+    $on_delete: AccountEventParser.nullable(),
+});
 type TAccountEventFields = `account_name` | `by_account_id` | `server_iso_timestamp` | `device_iso_timestamp`;
 type TMetaFields =
     | `$standard.${`created_at` | `updated_at`}`
@@ -102,9 +102,9 @@ const parseFormFirestoreDocToJson = transformJson({
 });
 export type TDbDoc<T extends string> = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data(): { [K in keyof typeof MetaParser]: (typeof MetaParser)[K]['_output'] } & { $ref: pointer.TDoc<T> } & Record<string, any>;
+    data(): (typeof MetaParser)['_output'] & { $ref: pointer.TDoc<T> } & Record<string, any>;
     getVal(type: '$ref'): pointer.TDoc<T>;
-    getVal<K extends keyof typeof MetaParser>(type: K): (typeof MetaParser)[K]['_output'];
+    getVal<K extends keyof typeof MetaParser.shape>(type: K): (typeof MetaParser.shape)[K]['_output'];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     getVal<T = any>(field: string): T;
     getVal<Z extends z.ZodType>(field: string, parser: Z): Z['_output'];
@@ -128,7 +128,7 @@ export function fromSnapshotToJson<T extends string>(
         },
         getVal(field: string, parser?: z.ZodType) {
             if (field === '$ref') return ref as never;
-            parser ??= (MetaParser as Record<string, z.ZodType>)[field] as never;
+            parser ??= (MetaParser.shape as Record<string, z.ZodType>)[field] as never;
             let val = getVal(field);
             if (parser) val = parser.parse(val);
             return val as never;
