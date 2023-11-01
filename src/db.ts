@@ -38,10 +38,6 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
         this.validateDocRef(data.$);
         return Ref.doc(this.db, data);
     }
-    query<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(data: Ref.TQueryArg<T>, params?: Ref.QueryParams): Ref.TQuery<T> {
-        this.validateCollRef(data.$);
-        return Ref.query(this.db, data, params ?? {});
-    }
 
     async create<T extends DbPaths<DbPathsMap>, D extends Record<string | number, unknown>>(
         ref: Ref.TDoc<T> | Ref.TDocArg<T>,
@@ -83,9 +79,11 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
         return Parser.fromSnapshotToJson(this.db, docRef, snap);
     }
     async getQuery<T extends DbPaths<DbPathsMap> | CollectionGroup<CollectionGroupMap>>(
-        ref: Ref.TQuery<T>,
-        params: { limit?: number } & CursorParams
+        data: Ref.TQueryArg<T>,
+        params: { limit?: number } & CursorParams & Ref.QueryParams = {}
     ) {
+        this.validateCollRef(data.$);
+        const ref = Ref.query(this.db, data, params ?? {});
         let query = Ref.getQueryRef(ref);
         query = addCursor(params, query);
         if (params.limit) query = query.limit(params.limit);
