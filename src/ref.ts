@@ -1,4 +1,5 @@
 import { TDocFields } from './parser';
+import * as admin from 'firebase-admin';
 
 type TParams<T extends string> = T extends `${string}/{${infer A}}${infer B}` ? [A, ...TParams<B>] : [];
 type TPop<T extends string[]> = T extends [...infer A, string] ? A : T;
@@ -65,6 +66,11 @@ export type QueryParams = {
 export type TQueryArg<T extends string> = { $: T } & Params<T, true>;
 export type TQuery<T extends string> = TQueryRef<T> & Params<T, true>;
 
+function getFilterVal(val: unknown) {
+    if (val instanceof Date) return admin.firestore.Timestamp.fromDate(val);
+    return val;
+}
+
 export function query<T extends string>(db: FirebaseFirestore.Firestore, data: TQueryArg<T>, params: QueryParams): TQuery<T> {
     let query;
     const path = parseDataToPath(data);
@@ -77,7 +83,7 @@ export function query<T extends string>(db: FirebaseFirestore.Firestore, data: T
         if (!params.filters) params.filters = [];
         params.filters.push(['$on_delete', '==', null]);
     }
-    if (params.filters) for (const [field, op, val] of params.filters) query = query.where(field, op, val);
+    if (params.filters) for (const [field, op, val] of params.filters) query = query.where(field, op, getFilterVal(val));
     return Object.assign(data, { [queryRef]: query, [queryParams]: params });
 }
 export function getQueryRef(query: TQuery<string>) {
