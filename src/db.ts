@@ -46,7 +46,7 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
     ) {
         const docRef = this.doc(ref);
         await this.apis.create(Ref.getDocRef(docRef), Parser.formJsonToFirestoreDoc('create', docRef, data, context));
-        return [docRef, data] as const;
+        return docRef;
     }
     async update<T extends DbPaths<DbPathsMap>, D extends Record<string | number, unknown>>(
         ref: Ref.TDoc<T> | Ref.TDocArg<T>,
@@ -55,7 +55,7 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
     ) {
         const docRef = this.doc(ref);
         await this.apis.update(Ref.getDocRef(docRef), Parser.formJsonToFirestoreDoc('update', docRef, data, context));
-        return [docRef, data] as const;
+        return docRef;
     }
     async delete<T extends DbPaths<DbPathsMap>, D extends Record<string | number, unknown> = Record<never, never>>(
         ref: Ref.TDoc<T> | Ref.TDocArg<T>,
@@ -65,12 +65,12 @@ export default class DB<DbPathsMap extends Record<string, unknown>, CollectionGr
         data ??= {} as never;
         const docRef = this.doc(ref);
         await this.apis.update(Ref.getDocRef(docRef), Parser.formJsonToFirestoreDoc('delete', docRef, data, context));
-        return [docRef, data] as const;
+        return docRef;
     }
     async hardDelete<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T> | Ref.TDocArg<T>) {
         const docRef = this.doc(ref);
         await this.apis.delete(Ref.getDocRef(docRef));
-        return [docRef] as const;
+        return docRef;
     }
 
     async getDoc<T extends DbPaths<DbPathsMap>>(ref: Ref.TDoc<T> | Ref.TDocArg<T>) {

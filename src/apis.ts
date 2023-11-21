@@ -16,24 +16,28 @@ export class BaseApis {
     get(ref: { get: () => Promise<unknown> }) {
         return ref.get();
     }
+    end() {
+        return Promise.resolve();
+    }
 }
 
 export class TransactionApi extends BaseApis {
     private transaction: FirebaseFirestore.Transaction;
+    private cbs: VoidFunction[] = [];
     constructor(transaction: FirebaseFirestore.Transaction) {
         super();
         this.transaction = transaction;
     }
     create(ref: FirebaseFirestore.DocumentReference, data: unknown) {
-        this.transaction.create(ref, data);
+        this.cbs.push(() => this.transaction.create(ref, data));
         return Promise.resolve();
     }
     update(ref: FirebaseFirestore.DocumentReference, data: unknown) {
-        this.transaction.update(ref, data as never);
+        this.cbs.push(() => this.transaction.update(ref, data as never));
         return Promise.resolve();
     }
     delete(ref: FirebaseFirestore.DocumentReference) {
-        this.transaction.delete(ref);
+        this.cbs.push(() => this.transaction.delete(ref));
         return Promise.resolve();
     }
     get(query: FirebaseFirestore.Query): Promise<FirebaseFirestore.QuerySnapshot>;
@@ -43,6 +47,11 @@ export class TransactionApi extends BaseApis {
     ): Promise<FirebaseFirestore.AggregateQuerySnapshot<T>>;
     get(ref: never) {
         return this.transaction.get(ref as never) as never;
+    }
+    async end() {
+        for (const cb of this.cbs) {
+            cb();
+        }
     }
 }
 
@@ -63,5 +72,8 @@ export class BatchApi extends BaseApis {
     delete(ref: FirebaseFirestore.DocumentReference) {
         this.batch.delete(ref);
         return Promise.resolve();
+    }
+    async end() {
+        await this.batch.commit();
     }
 }

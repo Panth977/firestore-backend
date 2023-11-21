@@ -7,15 +7,25 @@ type Params<T extends string, popLast extends boolean> = {
     [k in popLast extends true ? TPop<TParams<T>>[number] : TParams<T>[number]]: string;
 };
 
-function parseDataToPath(data: TDocArg<string> | TQueryArg<string>): { path: string; removedTrailing: boolean } {
-    if (!data.$.includes('{')) return { path: data.$, removedTrailing: false };
+function parseDataToPath<T extends TDocArg<string> | TQueryArg<string>>(
+    data: T,
+    isColl: boolean
+): { path: string; removedTrailing: boolean; params: T } {
+    const params: T = { $: data.$ } as never;
+    if (!data.$.includes('{')) return { path: data.$, removedTrailing: false, params };
     let path: string = data.$;
-    for (const param in data) path = path.replace(`{${param}}`, (data as Record<string, string>)[param]);
-    if ((path + '{').indexOf('{') < path.lastIndexOf('/')) throw new Error('incomplete arguments');
-    if (path.includes('{')) {
-        return { path: path.substring(0, path.lastIndexOf('/')), removedTrailing: true };
+    if (isColl) path = data.$.substring(0, data.$.lastIndexOf('/'));
+    for (const param in data) {
+        if (path.includes(`{${param}}`)) {
+            const v = (data as Record<string, string>)[param];
+            path = path.replace(`{${param}}`, v);
+            params[param] = v as never;
+        }
     }
-    return { path, removedTrailing: false };
+    if (isColl) path += data.$.substring(data.$.lastIndexOf('/'));
+    if ((path + '{').indexOf('{') < path.lastIndexOf('/')) throw new Error('incomplete arguments');
+    if (path.includes('{')) return { path: path.substring(0, path.lastIndexOf('/')), removedTrailing: true, params };
+    return { path, removedTrailing: false, params };
 }
 
 /* ****** DOC ****** */
@@ -28,17 +38,11 @@ export type TDocArg<T extends string> = { $: T } & Params<T, false>;
 export type TDoc<T extends string> = TDocRef<T> & Params<T, false>;
 export const autoDocID = '{undefined}' as never;
 
-export function doc<T extends string>(
-    db: FirebaseFirestore.Firestore,
-    data: TDocArg<T> | TDoc<T>,
-    ref?: FirebaseFirestore.DocumentReference
-): TDoc<T> {
-    if (docRef in data) return data;
-    if (ref) return Object.assign(data, { [docRef]: ref });
-    const path = parseDataToPath(data);
+export function doc<T extends string>(db: FirebaseFirestore.Firestore, data: TDocArg<T> | TDoc<T>): TDoc<T> {
+    const path = parseDataToPath(data, false);
     if (path.removedTrailing) {
         const ref = db.collection(path.path).doc();
-        return Object.assign(data, {
+        return Object.assign(path.params, {
             [docRef]: ref,
             [data.$.substring(data.$.lastIndexOf('/') + 2, data.$.length - 1)]: ref.id,
         });
@@ -73,7 +77,7 @@ function getFilterVal(val: unknown) {
 
 export function query<T extends string>(db: FirebaseFirestore.Firestore, data: TQueryArg<T>, params: QueryParams): TQuery<T> {
     let query;
-    const path = parseDataToPath(data);
+    const path = parseDataToPath(data, true);
     if (path.removedTrailing) {
         query = db.collection(path.path);
     } else {

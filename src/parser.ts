@@ -115,12 +115,7 @@ export function fromSnapshotToJson<T extends string>(
     ref: pointer.TDoc<T> | T,
     snapshot: FirebaseFirestore.DocumentSnapshot
 ): TDbDoc<T> {
-    const cache: Record<string, unknown> = {};
-    function getVal(field: string) {
-        if (!(field in cache)) cache[field] = parseFormFirestoreDocToJson(snapshot.get(field));
-        return cache[field];
-    }
-    if (typeof ref === 'string') ref = pointer.doc(db, getVal('$ref') as never, snapshot.ref);
+    if (typeof ref === 'string') ref = pointer.doc(db, snapshot.get('$ref') as never);
     return {
         data() {
             if (!snapshot.exists) new Error('No data found');
@@ -129,7 +124,7 @@ export function fromSnapshotToJson<T extends string>(
         getVal(field: string, parser?: z.ZodType) {
             if (field === '$ref') return ref as never;
             parser ??= (MetaParser.shape as Record<string, z.ZodType>)[field] as never;
-            let val = getVal(field);
+            let val = parseFormFirestoreDocToJson(snapshot.get(field));
             if (parser) val = parser.parse(val);
             return val as never;
         },
